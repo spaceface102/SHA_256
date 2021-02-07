@@ -2,25 +2,19 @@
 #include <stdint.h>
 
 
-
-
-#define	opt_type uint64_t			//optimal type for 64 bit sys
+#define	opt_type uint64_t	    //optimal type for 64 bit sys
 #define ensure32 0x00000000ffffffff //limit to 32 bit value while using 64 bit word
-#define HASH_SIZE 8					//H (hash values), eight 32 bit values (256 bits)
-#define current 0					//H (hash values); current is index 0
-#define new		1					//H (hash values); new is index 1
-#define BLOCK_SIZE 64 				//64 blocks in hash
-//************************************************//
-//make a look up table containg the mod values    //
-//for final step of hash!!!                       //
-//************************************************//
+#define HASH_SIZE 8   		    //H (hash values), eight 32 bit values (256 bits)
+#define current 0		    //H (hash values); current is index 0
+#define new	1		    //H (hash values); new is index 1
+#define BLOCK_SIZE 64 		    //64 blocks in hash
 
 //GLOBAL VALUES/Constants
-//constants H(0)0, ..., H(0)7 aka inital hash values
+//constants H0, ..., H7 aka inital hash values
 opt_type H[2][HASH_SIZE] = {
-{1779033703, 3144134277, 1013904242, 2773480762,
+{1779033703, 3144134277, 1013904242, 2773480762, //current
  1359893119, 2600822924, 528734635, 1541459225},
-{1779033703, 3144134277, 1013904242, 2773480762,
+{1779033703, 3144134277, 1013904242, 2773480762, //new
  1359893119, 2600822924, 528734635, 1541459225} };
 
 //Fractional part of the cuberoot of the first 64 prime numbers
@@ -57,19 +51,101 @@ int main(void)
 	return 0;
 }
 
-void compression(void)
+void compression(void/*struct block *data, opt_type *hash*/)
 {
-	//defines head of H, used since last block is tossed, should just make it first block
-	static opt_type H_access[BLOCK_SIZE] = {
-	0, 1, 2, 3, 4, 5, 6, 7, //a == 0...h == 7
-	1, 2, 3, 4, 5, 6, 7, 0, //a == 1...h == 0
-	2, 3, 4, 5, 6, 7, 0, 1, 
-	3, 4, 5, 6, 7, 0, 1, 2, 
-	4, 5, 6, 7, 0, 1, 2, 3, 
-	5, 6, 7, 0, 1, 2, 3, 4, 
-	6, 7, 0, 1, 2, 3, 4, 5, 
-	7, 0, 1, 2, 3, 4, 5, 6,	}; //a == 7...h == 6
+	//maps H, used to handle last block tossed
+	//could reduce to just an array who is 
+	//HASH_SIZE by HASH_SIZE, but I would need
+	//to use i%HASH_SIZE to access the correct column
+	//This is the fastest way.
+	static opt_type H_access[BLOCK_SIZE][HASH_SIZE] = {
+	//BLOCK_SIZE rows, HASH_SIZE columns
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#0
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#1
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+	
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#2
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#3
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#4
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+	
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#5
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+	
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#6
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6},
+	
+	{0, 1, 2, 3, 4, 5, 6, 7},
+	{1, 2, 3, 4, 5, 6, 7, 0},
+	{2, 3, 4, 5, 6, 7, 0, 1},
+	{3, 4, 5, 6, 7, 0, 1, 2}, //#7
+	{4, 5, 6, 7, 0, 1, 2, 3},
+	{5, 6, 7, 0, 1, 2, 3, 4},
+	{6, 7, 0, 1, 2, 3, 4, 5},
+	{7, 0, 1, 2, 3, 4, 5, 6}
+	};
+	
+	
 	opt_type T[2]; //temp words; part of sha algo
+
+	
+	if (H_access[60][2] == H_access[42][2]) {printf("True");}
+	else {printf("False");}
+
+	//for(opt_type i = 0; i < BLOCK_SIZE; i++)
+	//{	
+	//	T[0] = BSIG1(hash[new][H_access[i][4]]
+	//}
+
+
 
 opt_type ROTR(opt_type x, opt_type rot)
 	{return ( (x>>rot) | (x<<(32 - rot)) );	}
@@ -92,5 +168,5 @@ opt_type SSIG0(opt_type x)
 opt_type SSIG1(opt_type x)
 	{return ( ROTR(x, 17) ^ ROTR(x, 19) ^ (x>>10) );	}
 
-opt_type to32bit(out_type x);
+opt_type to32bit(opt_type x)
 	{return x&ensure32;}

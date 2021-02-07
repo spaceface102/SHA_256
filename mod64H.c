@@ -2,15 +2,16 @@
 
 int main(void)
 {
-	int x;
+	int x, j;
 	printf("\n");
 	for(int i = 0; i < 8; i++)
-	{	for(int j = 0; j < 8; j++)
+	{	printf("{");
+		for(j = 0; j < 7; j++)
 		{
 			x = ((i+j)%8);
 			printf("%d, ", x);
 		}
-		printf("\n");
+		printf("%d},\n", ((i + j)%8));
 	}
 	return 0;
 }
