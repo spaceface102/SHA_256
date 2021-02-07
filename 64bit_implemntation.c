@@ -203,7 +203,7 @@ void compression(void/*struct block *data, opt_type *hash*/)
 	};
 	
 	
-	opt_type T[2]; //temp words; part of sha algo
+	opt_type T[2]; //temp words; part of sha256 algo
 
 	
 	if (H_access[11][2] == H_access[19][2]) {printf("True");}
