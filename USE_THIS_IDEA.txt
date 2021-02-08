@@ -1,0 +1,2 @@
+Use small python script to write to make reading user input easier, just allow for user to input data to script, convert to bytes, write to predetermined file, open the file in C, clear the file in python again when the hash is severed. Like this you don't need to worry about \n when making a user write into a file and it also allows you to reuse codecat file_test.txt !
+#This is only for small messages that they should want to hash. Say if you want to test out abc really quick or something like that.
