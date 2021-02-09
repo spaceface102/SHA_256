@@ -29,7 +29,7 @@ opt_type H[2][HASH_SIZE] = {
 //EOGlobals
 
 //Function Declerations
-int main(void);
+int main(int agrc, char *argv[]);
 opt_type ROTR(opt_type x, opt_type rot);
 opt_type CH(opt_type x, opt_type y, opt_type z);
 opt_type MAJ(opt_type x, opt_type y, opt_type z);
@@ -38,37 +38,46 @@ opt_type BSIG1(opt_type x);
 opt_type SSIG0(opt_type x);
 opt_type SSIG1(opt_type x);
 
+char *handlearg(opt_type argc, char *argv[]);
 void openfile(FILE **fp, char *fname);
 void readfile(opt_type buffer[BLOCK_SIZE], FILE *fp, opt_type output[2]);
-opt_type getready_readoutput(opt_type output[2], opt_type buffer[BLOCK_SIZE], opt_type byte_counter);  
+opt_type getready_readoutput(opt_type output[2], opt_type buffer[BLOCK_SIZE], opt_type byte_counter);
+void padset(opt_type output[2], opt_type buffer[BLOCK_SIZE], opt_type byte_counter);  
 void endianswap(opt_type *buffer_index); //custom as should only swap the "last" 32 bits
 void create_64_words(opt_type buffer[BLOCK_SIZE]);
 void compression(opt_type buffer[BLOCK_SIZE]);
 void display_digest(void);
 
 //SOMEWHERE ask if the last "/n" should be included.
-int main(void)
+int main(int argc, char *argv[])
 {
 	FILE *fp;
-	opt_type buffer[BLOCK_SIZE], output[2], byte_counter = 0;
-	openfile(&fp, "file_test.txt");
-	readfile(buffer, fp, output);
-	//last_bytes_read + READ_BYTES*(full_loops_done - 1)
-	byte_counter += output[0] + READ_BYTES*(output[1] - 1); 
-	getready_readoutput(output, buffer, byte_counter);
-	create_64_words(buffer);
-	compression(buffer);
-	display_digest();
-	// if (output[0] != READ_BYTES)//if true, done grabing data, got to EOF
-	// {
-	// 	if (getready_readoutput(output, buffer, byte_counter)) //returns 1 if need one more block for length data
-	// 	{
+	opt_type buffer[BLOCK_SIZE], output[2], byte_counter = 0, end = 0;
+	openfile(&fp, handlearg(argc, argv));
 
-	// 	}	
-	// }
+	while(1)
+	{	
+		readfile(buffer, fp, output);
+		//last_bytes_read + READ_BYTES*(full_loops_done - 1)
+		byte_counter += output[0] + READ_BYTES*(output[1] - 1); 
+		if (output[0] != READ_BYTES) //not always end if read this point, might still need 1 more blk
+			{end = getready_readoutput(output, buffer, byte_counter);}
+		for(opt_type i = 0; i < output[1]; i++)
+			{endianswap(buffer + i);}
+		create_64_words(buffer);
+		compression(buffer);
+		if (end) {break;}
+	}
+	display_digest();
 	return 0;
 }
 //EOF
+
+char *handlearg(opt_type argc, char *argv[])
+{
+	if (argc == 2) {return argv[1];}
+	else {printf("No file arguments were provided!\a\n"); exit(42);}
+}
 
 void openfile(FILE **fp, char *fname)
 {
@@ -103,30 +112,36 @@ void readfile(opt_type buffer[BLOCK_SIZE], FILE *fp, opt_type output[2])
 //makes sense of output[2]; output == [last_bytes_read, last_word(i)]
 opt_type getready_readoutput(opt_type output[2], opt_type buffer[BLOCK_SIZE], opt_type byte_counter)
 {
+	static opt_type padset_count = 0;
 	byte_counter *= 8; //convert to bit_counter
+	if (padset_count) //must mean we are definetly in the edge case extra last buffer block
+		{memset(buffer, CLR, sizeof(opt_type)*INIT_BLOCK_SIZE);} //clear all the memory prepring for the next steps.
+	else //ensure that we are not doing the operation more than once.
+		{padset(output, buffer, byte_counter); padset_count++;}
+	
 	if (output[1] > EDGEBLK)
-	{
-		printf("hello"); //work on this
-	}
+		{return 0;} //not end yet
 	else //output[1] <= EDGEBLK ... this is the last block can add bits size.
 	{
-		memset(((uint8_t *)(buffer + output[1] - 1)+output[0]), PADSEP, 1); 
-		/*buffer + ouput[1](last_word) - 1 (since last_word == num of read loops not curr index)
-		last_word -1 == last buffer index....Then convert to uint8_t pointer, and increment pointer
-		by output[0], aka the last num_bytes_read to reach the byte that needs to be writen to.*/
-		memset(((uint8_t *)(buffer + output[1] - 1)+output[0]+1), CLR, READ_BYTES - (output[0] + 1));
-		//sets last ending bits in last word (the one where PADSEP was inserted) to zero 
-		for(opt_type i = 0; i < output[1]; i++)
-			{endianswap(buffer + i);}
-		//consider possibly moving to only setting 32 bit space that is being used in the 64 bit
-		//wrapper to zero, as later operation will certainly set those bits to zero
-		memset((buffer + output[1]), CLR, sizeof(opt_type)*(INIT_BLOCK_SIZE - output[1]));
 		//since little endian, have to pass the larger address (+1) of byte_counter to send over 
 		//most sig bytes of byte_counter: if big endian then the the opposite would be true!
 		buffer[EDGEBLK] = *((uint32_t *)(&byte_counter) + 1); //most sig 4 byte word
 		buffer[EDGEBLK + 1] = *((uint32_t *)(&byte_counter)); //least sig 4 byte word
+		return 1; //end is here.
 	}
-	return 0xfeedbeef;//FIX THIS TEMP!!!
+}
+
+void padset(opt_type output[2], opt_type buffer[BLOCK_SIZE], opt_type byte_counter)
+{
+	memset(((uint8_t *)(buffer + output[1] - 1)+output[0]), PADSEP, 1); 
+	/*buffer + ouput[1](last_word) - 1 (since last_word == num of read loops not curr index)
+	last_word -1 == last buffer index....Then convert to uint8_t pointer, and increment pointer
+	by output[0], aka the last num_bytes_read to reach the byte that needs to be writen to.*/
+	memset(((uint8_t *)(buffer + output[1] - 1)+output[0]+1), CLR, READ_BYTES - (output[0] + 1));
+	//sets last ending bits in last word (the one where PADSEP was inserted) to zero 
+	//consider possibly moving to only setting 32 bit space that is being used in the 64 bit
+	//wrapper to zero, as later operation will certainly set those bits to zero
+	memset((buffer + output[1]), CLR, sizeof(opt_type)*(INIT_BLOCK_SIZE - output[1]));
 }
 
 void create_64_words(opt_type buffer[BLOCK_SIZE])
@@ -138,7 +153,7 @@ void create_64_words(opt_type buffer[BLOCK_SIZE])
 	was all done in prep in the "getready_readoutput() func!!!!!!!!!!!!!!*/
 	for(opt_type i = INIT_BLOCK_SIZE; i < BLOCK_SIZE; i++)
 		{buffer[i] = ((SSIG1(buffer[i-2]) + buffer[i-7] + 
-					 SSIG0(buffer[i-15]) + buffer[i -16])&(ENSURE32));}
+					 SSIG0(buffer[i-15]) + buffer[i-16])&(ENSURE32));}
 }
 
 void endianswap(opt_type *buffer_index) //also sets unused bits to zero!
@@ -267,14 +282,14 @@ void compression(opt_type buffer[BLOCK_SIZE])
 		H[current][H_access[i][4]] = ((ENSURE32)&(H[current][H_access[i][4]] + T[0]));
 	}
 	for(i = 0; i < HASH_SIZE; i++)
-		{H[current][i] += H[new][i];
+		{H[current][i] = ((ENSURE32)&(H[current][i] + H[new][i]));
 		H[new][i] = H[current][i];}
 }
 
 void display_digest(void)
 {
 	for(opt_type i = 0; i < HASH_SIZE; i++)
-		{printf("%lx", H[new][i]);}
+		{printf("%08lx", H[new][i]);}
 	printf("\n");
 }
 
